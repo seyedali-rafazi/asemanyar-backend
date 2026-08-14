@@ -1,0 +1,523 @@
+{
+  "info": {
+    "_postman_id": "a9f82d1c-b84e-4f51-9e2a-14d9f7b1e8a3",
+    "name": "Asemanha Flight Tracking API",
+    "description": "Comprehensive Postman collection for the Asemanha FastAPI Backend powered by OpenSky Network API.\n\n### Base URL\nDefault: `http://localhost:8000`\n\n### API Version\nPrefix: `/api/v1`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiPrefix",
+      "value": "/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "sampleIcao24",
+      "value": "738045",
+      "type": "string"
+    },
+    {
+      "key": "sampleAirportIcao",
+      "value": "OIII",
+      "type": "string"
+    },
+    {
+      "key": "sampleAntennaId",
+      "value": "ANT001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. System & Health",
+      "item": [
+        {
+          "name": "Root Info & Endpoints",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Returns API metadata, status, and directory of available endpoints."
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns backend health status, authentication mode, and cache TTL settings."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Aircraft & Fleet",
+      "item": [
+        {
+          "name": "List All Aircraft (Default Airspace)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/aircraft",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "aircraft"]
+            },
+            "description": "Retrieves enriched active aircraft list formatted for frontend UI."
+          },
+          "response": []
+        },
+        {
+          "name": "List Aircraft (Filtered by Airline & Search)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/aircraft?search=Iran&airline=Iran Air&on_ground=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "aircraft"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Iran",
+                  "description": "Search callsign, airline name, or ICAO ID"
+                },
+                {
+                  "key": "airline",
+                  "value": "Iran Air",
+                  "description": "Filter by airline name"
+                },
+                {
+                  "key": "on_ground",
+                  "value": "false",
+                  "description": "Filter airborne (false) vs on ground (true)"
+                }
+              ]
+            },
+            "description": "Retrieves aircraft matching search query and airline filters."
+          },
+          "response": []
+        },
+        {
+          "name": "List Aircraft (Filtered by Altitude Range)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/aircraft?min_altitude=15000&max_altitude=42000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "aircraft"],
+              "query": [
+                {
+                  "key": "min_altitude",
+                  "value": "15000",
+                  "description": "Minimum altitude in feet"
+                },
+                {
+                  "key": "max_altitude",
+                  "value": "42000",
+                  "description": "Maximum altitude in feet"
+                }
+              ]
+            },
+            "description": "Filters aircraft cruising between 15,000 ft and 42,000 ft."
+          },
+          "response": []
+        },
+        {
+          "name": "List Aircraft (Custom Bounding Box)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/aircraft?lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "aircraft"],
+              "query": [
+                {
+                  "key": "lamin",
+                  "value": "24.0",
+                  "description": "Lower latitude bound"
+                },
+                {
+                  "key": "lomin",
+                  "value": "44.0",
+                  "description": "Lower longitude bound"
+                },
+                {
+                  "key": "lamax",
+                  "value": "40.0",
+                  "description": "Upper latitude bound"
+                },
+                {
+                  "key": "lomax",
+                  "value": "64.0",
+                  "description": "Upper longitude bound"
+                }
+              ]
+            },
+            "description": "Retrieves active aircraft within specific geographic coordinates."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Aircraft Details by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/aircraft/{{sampleIcao24}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "aircraft", "{{sampleIcao24}}"]
+            },
+            "description": "Returns full telemetry, sensor IDs, position source, and details for a single aircraft."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Aircraft Track & Waypoints",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/aircraft/{{sampleIcao24}}/track",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "aircraft", "{{sampleIcao24}}", "track"]
+            },
+            "description": "Retrieves live flight trajectory waypoints, coordinates, and altitudes."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. OpenSky State Vectors",
+      "item": [
+        {
+          "name": "Get All State Vectors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/states/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "states", "all"]
+            },
+            "description": "Direct structured OpenSky state vector representation with rate-limit protection."
+          },
+          "response": []
+        },
+        {
+          "name": "Get State Vector by ICAO24 Hex",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/states/all?icao24={{sampleIcao24}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "states", "all"],
+              "query": [
+                {
+                  "key": "icao24",
+                  "value": "{{sampleIcao24}}",
+                  "description": "ICAO 24-bit transponder hex code"
+                }
+              ]
+            },
+            "description": "Fetches state vector for a specific aircraft transponder address."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Flights & Airport Schedules",
+      "item": [
+        {
+          "name": "Flights in Time Interval",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/flights/interval",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "flights", "interval"]
+            },
+            "description": "Retrieves flights active in the past 1-2 hours."
+          },
+          "response": []
+        },
+        {
+          "name": "Flights by Aircraft Transponder",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/flights/aircraft/{{sampleIcao24}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "flights", "aircraft", "{{sampleIcao24}}"]
+            },
+            "description": "Retrieves past flight logs and departures/arrivals for an aircraft."
+          },
+          "response": []
+        },
+        {
+          "name": "Airport Departures",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/flights/departures/{{sampleAirportIcao}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "flights", "departures", "{{sampleAirportIcao}}"]
+            },
+            "description": "Retrieves departed flights from specified airport (e.g. OIII = Mehrabad, OIIE = IKA, OIMM = Mashhad)."
+          },
+          "response": []
+        },
+        {
+          "name": "Airport Arrivals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/flights/arrivals/{{sampleAirportIcao}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "flights", "arrivals", "{{sampleAirportIcao}}"]
+            },
+            "description": "Retrieves arrived flights for specified airport ICAO code."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Tracks",
+      "item": [
+        {
+          "name": "Get Raw Trajectory Track by ICAO24",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/tracks/all?icao24={{sampleIcao24}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tracks", "all"],
+              "query": [
+                {
+                  "key": "icao24",
+                  "value": "{{sampleIcao24}}",
+                  "description": "ICAO 24-bit transponder address"
+                },
+                {
+                  "key": "time",
+                  "value": "0",
+                  "description": "Unix timestamp (0 for current/latest track)"
+                }
+              ]
+            },
+            "description": "Returns raw OpenSky trajectory waypoints."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Airports & Antennas",
+      "item": [
+        {
+          "name": "List All Airports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/airports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "airports"]
+            },
+            "description": "Returns airport reference list with ICAO, IATA, city, elevation, and runway count."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Airport by Code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/airports/{{sampleAirportIcao}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "airports", "{{sampleAirportIcao}}"]
+            },
+            "description": "Retrieves airport details by ICAO (e.g. OIII, OIIE) or IATA (THR, IKA) code."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Antennas & Receivers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/antennas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "antennas"]
+            },
+            "description": "Returns ADS-B ground stations, primary radars, and coverage ranges."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Antenna by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/antennas/{{sampleAntennaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "antennas", "{{sampleAntennaId}}"]
+            },
+            "description": "Retrieves specific ground sensor station details."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Airspace & Fleet Statistics",
+      "item": [
+        {
+          "name": "Get Fleet Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "stats"]
+            },
+            "description": "Computes aggregated live metrics: total aircraft, airborne vs on ground, unique airlines count, average altitude, and ground speed."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
