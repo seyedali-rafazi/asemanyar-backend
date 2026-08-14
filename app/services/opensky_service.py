@@ -23,11 +23,14 @@ class OpenSkyService:
 
     def __init__(self):
         self.base_url = settings.OPENSKY_BASE_URL.rstrip("/")
+        self.auth_url = settings.OPENSKY_AUTH_URL
         self.timeout = httpx.Timeout(
             timeout=settings.OPENSKY_REQUEST_TIMEOUT,
             connect=settings.OPENSKY_CONNECT_TIMEOUT,
         )
         self._client: Optional[httpx.AsyncClient] = None
+        self._oauth_token: Optional[str] = None
+        self._oauth_token_expiry: float = 0.0
 
     async def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -50,6 +53,51 @@ class OpenSkyService:
     async def close(self):
         if self._client and not self._client.is_closed:
             await self._client.aclose()
+
+    async def get_auth_headers(self) -> Dict[str, str]:
+        """
+        Returns authorization headers using OAuth2 Bearer token if clientId & clientSecret
+        are configured.
+        """
+        client_id = settings.OPENSKY_CLIENT_ID
+        client_secret = settings.OPENSKY_CLIENT_SECRET
+
+        if not client_id or not client_secret:
+            return {}
+
+        # Check if valid cached OAuth2 token exists
+        if self._oauth_token and time.time() < (self._oauth_token_expiry - 60):
+            return {"Authorization": f"Bearer {self._oauth_token}"}
+
+        # Request fresh OAuth2 access token
+        try:
+            client = await self.get_client()
+            logger.info(f"Requesting OpenSky OAuth2 token for client ID '{client_id}'...")
+            payload = {
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }
+            resp = await client.post(
+                self.auth_url,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                self._oauth_token = data.get("access_token")
+                expires_in = data.get("expires_in", 1800)
+                self._oauth_token_expiry = time.time() + expires_in
+                logger.info(f"OpenSky OAuth2 token refreshed successfully (expires in {expires_in}s).")
+                return {"Authorization": f"Bearer {self._oauth_token}"}
+            else:
+                logger.error(f"OpenSky OAuth2 token request failed ({resp.status_code}): {resp.text}")
+                self._oauth_token = None
+        except Exception as e:
+            logger.error(f"Error fetching OpenSky OAuth2 token: {self._format_error(e)}")
+            self._oauth_token = None
+
+        return {}
 
     def _format_error(self, e: Exception) -> str:
         err_type = type(e).__name__
@@ -106,11 +154,12 @@ class OpenSkyService:
 
         # Fetch from OpenSky API
         client = await self.get_client()
+        headers = await self.get_auth_headers()
         url = f"{self.base_url}/states/all"
 
         try:
             logger.info(f"Fetching live states from OpenSky API: {params}")
-            resp = await client.get(url, params=params)
+            resp = await client.get(url, params=params, headers=headers)
             
             if resp.status_code == 200:
                 data = resp.json()
@@ -126,6 +175,9 @@ class OpenSkyService:
                 cache_service.set(cache_key, (state_vectors, ts), ttl=settings.CACHE_TTL_SECONDS)
                 return state_vectors, ts, False
 
+            elif resp.status_code == 401:
+                logger.warning("OpenSky API returned HTTP 401 Unauthorized. Invalidating cached OAuth2 token.")
+                self._oauth_token = None
             elif resp.status_code == 429:
                 logger.warning("OpenSky API rate limit reached (HTTP 429). Utilizing cached fallback.")
             else:
@@ -167,12 +219,13 @@ class OpenSkyService:
             return cached
 
         client = await self.get_client()
+        headers = await self.get_auth_headers()
         url = f"{self.base_url}/tracks/all"
         params = {"icao24": icao24.lower(), "time": timestamp or 0}
 
         try:
             logger.info(f"Fetching track from OpenSky for {icao24}")
-            resp = await client.get(url, params=params)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
                 track_resp = OpenSkyTrackResponse(**data)
@@ -199,11 +252,12 @@ class OpenSkyService:
             return cached
 
         client = await self.get_client()
+        headers = await self.get_auth_headers()
         url = f"{self.base_url}/flights/all"
         params = {"begin": begin, "end": end}
 
         try:
-            resp = await client.get(url, params=params)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 raw_list = resp.json() or []
                 flights = [OpenSkyFlight(**item) for item in raw_list if isinstance(item, dict)]
@@ -227,11 +281,12 @@ class OpenSkyService:
             return cached
 
         client = await self.get_client()
+        headers = await self.get_auth_headers()
         url = f"{self.base_url}/flights/aircraft"
         params = {"icao24": icao24.lower(), "begin": begin, "end": end}
 
         try:
-            resp = await client.get(url, params=params)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 raw_list = resp.json() or []
                 flights = [OpenSkyFlight(**item) for item in raw_list if isinstance(item, dict)]
@@ -255,11 +310,12 @@ class OpenSkyService:
             return cached
 
         client = await self.get_client()
+        headers = await self.get_auth_headers()
         url = f"{self.base_url}/flights/departure"
         params = {"airport": airport_icao.upper(), "begin": begin, "end": end}
 
         try:
-            resp = await client.get(url, params=params)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 raw_list = resp.json() or []
                 flights = [OpenSkyFlight(**item) for item in raw_list if isinstance(item, dict)]
@@ -283,11 +339,12 @@ class OpenSkyService:
             return cached
 
         client = await self.get_client()
+        headers = await self.get_auth_headers()
         url = f"{self.base_url}/flights/arrival"
         params = {"airport": airport_icao.upper(), "begin": begin, "end": end}
 
         try:
-            resp = await client.get(url, params=params)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 raw_list = resp.json() or []
                 flights = [OpenSkyFlight(**item) for item in raw_list if isinstance(item, dict)]

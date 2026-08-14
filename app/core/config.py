@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, AliasChoices
 
 
 class Settings(BaseSettings):
@@ -20,10 +20,11 @@ class Settings(BaseSettings):
 
     # OpenSky Network API
     OPENSKY_BASE_URL: str = "https://opensky-network.org/api"
+    OPENSKY_AUTH_URL: str = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
     OPENSKY_USERNAME: Optional[str] = None
     OPENSKY_PASSWORD: Optional[str] = None
-    OPENSKY_CLIENT_ID: Optional[str] = None
-    OPENSKY_CLIENT_SECRET: Optional[str] = None
+    OPENSKY_CLIENT_ID: Optional[str] = Field(default=None, validation_alias=AliasChoices("OPENSKY_CLIENT_ID", "clientId", "CLIENT_ID"))
+    OPENSKY_CLIENT_SECRET: Optional[str] = Field(default=None, validation_alias=AliasChoices("OPENSKY_CLIENT_SECRET", "clientSecret", "CLIENT_SECRET"))
     OPENSKY_REQUEST_TIMEOUT: float = 25.0
     OPENSKY_CONNECT_TIMEOUT: float = 15.0
 

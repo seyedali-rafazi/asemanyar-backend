@@ -15,7 +15,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}...")
     logger.info(f"OpenSky API Target: {settings.OPENSKY_BASE_URL}")
-    if settings.OPENSKY_USERNAME:
+    if settings.OPENSKY_CLIENT_ID:
+        logger.info(f"OpenSky Authenticated via OAuth2 Client ID: {settings.OPENSKY_CLIENT_ID}")
+    elif settings.OPENSKY_USERNAME:
         logger.info(f"OpenSky Authenticated as: {settings.OPENSKY_USERNAME}")
     else:
         logger.info("OpenSky running in Anonymous Mode (10s rate limit)")
@@ -74,6 +76,6 @@ async def health_check():
     """Health check endpoint for container / system monitoring."""
     return {
         "status": "healthy",
-        "opensky_authenticated": bool(settings.OPENSKY_USERNAME),
+        "opensky_authenticated": bool(settings.OPENSKY_USERNAME or settings.OPENSKY_CLIENT_ID),
         "cache_ttl_seconds": settings.CACHE_TTL_SECONDS,
     }
