@@ -9,27 +9,32 @@ router = APIRouter(prefix="/airports", tags=["Airports"])
 
 
 def _load_airports() -> List[Airport]:
-    file_path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "..",
-        "..",
-        "..",
-        "src",
-        "pages",
-        "Home",
-        "components",
-        "AirportLayer",
-        "data",
-        "iran_airports.json",
-    )
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return [Airport(**item) for item in data]
-        except Exception:
-            pass
+    file_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "data", "iran_airports.json"),
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "..",
+            "src",
+            "pages",
+            "Home",
+            "components",
+            "AirportLayer",
+            "data",
+            "iran_airports.json",
+        ),
+        os.path.join(os.getcwd(), "backend", "app", "data", "iran_airports.json"),
+    ]
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return [Airport(**item) for item in data]
+            except Exception:
+                pass
 
     # Built-in fallback
     return [

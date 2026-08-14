@@ -123,3 +123,18 @@ def test_enrich_state_vector():
     assert aircraft.speed_kts == 447
     assert aircraft.heading_deg == 180
     assert len(aircraft.path) > 0
+
+
+@pytest.mark.asyncio
+async def test_aircraft_bbox_query():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Query the exact URL reported by user: lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0
+        response = await client.get("/api/v1/aircraft?lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert "aircraft" in data
+        assert len(data["aircraft"]) > 0
+        assert data["total"] > 0
+        assert data["count"] > 0
+

@@ -1,0 +1,14 @@
+[
+  { "id": "AN001", "name": "Tehran Primary Radar", "type": "Radar", "lat": 35.72, "lon": 51.42, "frequency": "124.5 MHz", "range_km": 250, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN002", "name": "Mashhad ADS-B Station", "type": "ADS-B", "lat": 36.28, "lon": 59.58, "frequency": "1090 MHz", "range_km": 400, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN003", "name": "Shiraz VOR/DME", "type": "VOR/DME", "lat": 29.55, "lon": 52.6, "frequency": "113.2 MHz", "range_km": 180, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN004", "name": "Isfahan Radar Tower", "type": "Radar", "lat": 32.76, "lon": 51.87, "frequency": "125.8 MHz", "range_km": 220, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN005", "name": "Tabriz VOR Station", "type": "VOR", "lat": 38.15, "lon": 46.25, "frequency": "116.4 MHz", "range_km": 160, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN006", "name": "Bandar Abbas Coastal Radar", "type": "Radar", "lat": 27.19, "lon": 56.38, "frequency": "127.1 MHz", "range_km": 200, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN007", "name": "Kish Island ADS-B", "type": "ADS-B", "lat": 26.54, "lon": 53.97, "frequency": "1090 MHz", "range_km": 350, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN008", "name": "Ahvaz DME Beacon", "type": "DME", "lat": 31.34, "lon": 48.77, "frequency": "112.6 MHz", "range_km": 120, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN009", "name": "Kerman Relay Tower", "type": "Relay", "lat": 30.28, "lon": 56.96, "frequency": "118.0 MHz", "range_km": 150, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN010", "name": "Zahedan Border Radar", "type": "Radar", "lat": 29.48, "lon": 60.91, "frequency": "126.3 MHz", "range_km": 280, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN011", "name": "Rasht North VOR", "type": "VOR", "lat": 37.33, "lon": 49.62, "frequency": "114.8 MHz", "range_km": 140, "operator": "Iran ATC", "status": "active" },
+  { "id": "AN012", "name": "Yazd Central ADS-B", "type": "ADS-B", "lat": 31.91, "lon": 54.28, "frequency": "1090 MHz", "range_km": 380, "operator": "Iran ATC", "status": "inactive" }
+]

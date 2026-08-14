@@ -1,0 +1,17 @@
+[
+  { "id": "AP001", "name": "Imam Khomeini International", "iata": "IKA", "icao": "OIIE", "lat": 35.4161, "lon": 51.1522, "city": "Tehran", "country": "Iran", "elevation_ft": 3305, "runways": 2 },
+  { "id": "AP002", "name": "Mehrabad International", "iata": "THR", "icao": "OIII", "lat": 35.6892, "lon": 51.3134, "city": "Tehran", "country": "Iran", "elevation_ft": 3954, "runways": 2 },
+  { "id": "AP003", "name": "Mashhad International", "iata": "MHD", "icao": "OIMM", "lat": 36.2352, "lon": 59.641, "city": "Mashhad", "country": "Iran", "elevation_ft": 3263, "runways": 2 },
+  { "id": "AP004", "name": "Shiraz International", "iata": "SYZ", "icao": "OISS", "lat": 29.5392, "lon": 52.5898, "city": "Shiraz", "country": "Iran", "elevation_ft": 4924, "runways": 2 },
+  { "id": "AP005", "name": "Isfahan International", "iata": "IFN", "icao": "OIFM", "lat": 32.7508, "lon": 51.8614, "city": "Isfahan", "country": "Iran", "elevation_ft": 5312, "runways": 2 },
+  { "id": "AP006", "name": "Tabriz International", "iata": "TBZ", "icao": "OITT", "lat": 38.1339, "lon": 46.235, "city": "Tabriz", "country": "Iran", "elevation_ft": 4459, "runways": 2 },
+  { "id": "AP007", "name": "Bandar Abbas International", "iata": "BND", "icao": "OIKB", "lat": 27.2183, "lon": 56.3778, "city": "Bandar Abbas", "country": "Iran", "elevation_ft": 22, "runways": 1 },
+  { "id": "AP008", "name": "Kish International", "iata": "KIH", "icao": "OIBK", "lat": 26.5262, "lon": 53.9803, "city": "Kish", "country": "Iran", "elevation_ft": 101, "runways": 1 },
+  { "id": "AP009", "name": "Ahvaz International", "iata": "AWZ", "icao": "OIAW", "lat": 31.3374, "lon": 48.762, "city": "Ahvaz", "country": "Iran", "elevation_ft": 66, "runways": 1 },
+  { "id": "AP010", "name": "Kerman Airport", "iata": "KER", "icao": "OIKK", "lat": 30.2744, "lon": 56.9511, "city": "Kerman", "country": "Iran", "elevation_ft": 5741, "runways": 1 },
+  { "id": "AP011", "name": "Zahedan International", "iata": "ZAH", "icao": "OIZH", "lat": 29.4757, "lon": 60.9062, "city": "Zahedan", "country": "Iran", "elevation_ft": 4524, "runways": 1 },
+  { "id": "AP012", "name": "Rasht Airport", "iata": "RAS", "icao": "OIGG", "lat": 37.3233, "lon": 49.6178, "city": "Rasht", "country": "Iran", "elevation_ft": -49, "runways": 1 },
+  { "id": "AP013", "name": "Urmia Airport", "iata": "OMH", "icao": "OITR", "lat": 37.6681, "lon": 45.0687, "city": "Urmia", "country": "Iran", "elevation_ft": 4343, "runways": 1 },
+  { "id": "AP014", "name": "Yazd Shahid Sadooghi", "iata": "AZD", "icao": "OIYY", "lat": 31.9049, "lon": 54.2765, "city": "Yazd", "country": "Iran", "elevation_ft": 4054, "runways": 1 },
+  { "id": "AP015", "name": "Birjand International", "iata": "XBJ", "icao": "OIMB", "lat": 32.8981, "lon": 59.2661, "city": "Birjand", "country": "Iran", "elevation_ft": 4941, "runways": 1 }
+]

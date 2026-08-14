@@ -24,7 +24,12 @@ class Settings(BaseSettings):
     OPENSKY_PASSWORD: Optional[str] = None
     OPENSKY_CLIENT_ID: Optional[str] = None
     OPENSKY_CLIENT_SECRET: Optional[str] = None
-    OPENSKY_REQUEST_TIMEOUT: float = 12.0
+    OPENSKY_REQUEST_TIMEOUT: float = 25.0
+    OPENSKY_CONNECT_TIMEOUT: float = 15.0
+
+    # Proxy Configuration (Optional - for environments requiring proxy to reach OpenSky)
+    PROXY_URL: Optional[str] = None
+    USE_SYSTEM_PROXY: bool = False
 
     # Cache Settings
     CACHE_TTL_SECONDS: int = 10

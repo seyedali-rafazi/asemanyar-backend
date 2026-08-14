@@ -9,27 +9,32 @@ router = APIRouter(prefix="/antennas", tags=["Antennas"])
 
 
 def _load_antennas() -> List[Antenna]:
-    file_path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "..",
-        "..",
-        "..",
-        "src",
-        "pages",
-        "Home",
-        "components",
-        "AntennaLayer",
-        "data",
-        "iran_antennas.json",
-    )
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return [Antenna(**item) for item in data]
-        except Exception:
-            pass
+    file_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "data", "iran_antennas.json"),
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "..",
+            "src",
+            "pages",
+            "Home",
+            "components",
+            "AntennaLayer",
+            "data",
+            "iran_antennas.json",
+        ),
+        os.path.join(os.getcwd(), "backend", "app", "data", "iran_antennas.json"),
+    ]
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return [Antenna(**item) for item in data]
+            except Exception:
+                pass
 
     return [
         Antenna(id="ANT001", name="Tehran North Radar", code="THR-RAD-1", lat=35.75, lon=51.40, city="Tehran", range_km=250, frequency_mhz=1090.0, type="Primary Radar", status="Active"),

@@ -23,7 +23,10 @@ class OpenSkyService:
 
     def __init__(self):
         self.base_url = settings.OPENSKY_BASE_URL.rstrip("/")
-        self.timeout = httpx.Timeout(settings.OPENSKY_REQUEST_TIMEOUT, connect=6.0)
+        self.timeout = httpx.Timeout(
+            timeout=settings.OPENSKY_REQUEST_TIMEOUT,
+            connect=settings.OPENSKY_CONNECT_TIMEOUT,
+        )
         self._client: Optional[httpx.AsyncClient] = None
 
     async def get_client(self) -> httpx.AsyncClient:
@@ -31,17 +34,35 @@ class OpenSkyService:
             auth = None
             if settings.OPENSKY_USERNAME and settings.OPENSKY_PASSWORD:
                 auth = (settings.OPENSKY_USERNAME, settings.OPENSKY_PASSWORD)
-            self._client = httpx.AsyncClient(
-                timeout=self.timeout,
-                auth=auth,
-                trust_env=False,
-                headers={"User-Agent": "Asemanha-Flight-Tracker/1.0"},
-            )
+
+            client_kwargs: Dict[str, Any] = {
+                "timeout": self.timeout,
+                "auth": auth,
+                "headers": {"User-Agent": "Asemanha-Flight-Tracker/1.0"},
+                "trust_env": settings.USE_SYSTEM_PROXY,
+            }
+            if settings.PROXY_URL:
+                client_kwargs["proxy"] = settings.PROXY_URL
+
+            self._client = httpx.AsyncClient(**client_kwargs)
         return self._client
 
     async def close(self):
         if self._client and not self._client.is_closed:
             await self._client.aclose()
+
+    def _format_error(self, e: Exception) -> str:
+        err_type = type(e).__name__
+        msg = str(e).strip()
+        if not msg:
+            if isinstance(e, httpx.ConnectTimeout):
+                return f"{err_type}: Connection to OpenSky timed out (exceeded {settings.OPENSKY_CONNECT_TIMEOUT}s). OpenSky might be blocked or unreachable from this network."
+            elif isinstance(e, httpx.ReadTimeout):
+                return f"{err_type}: Read timed out while waiting for OpenSky response (exceeded {settings.OPENSKY_REQUEST_TIMEOUT}s)."
+            elif isinstance(e, httpx.ConnectError):
+                return f"{err_type}: Failed to connect to OpenSky. Check network or proxy settings."
+            return f"{err_type}: Network error or host unreachable"
+        return f"{err_type}: {msg}"
 
     def _build_cache_key(self, prefix: str, params: Dict[str, Any]) -> str:
         param_str = "_".join(f"{k}:{v}" for k, v in sorted(params.items()) if v is not None)
@@ -111,20 +132,26 @@ class OpenSkyService:
                 logger.warning(f"OpenSky API returned HTTP {resp.status_code}: {resp.text[:200]}")
 
         except Exception as e:
-            logger.error(f"Error connecting to OpenSky API: {str(e)}")
+            logger.error(f"Error connecting to OpenSky API: {self._format_error(e)}")
 
-        # Fallback to stale cache
+        # 1. Fallback to stale cache if it contains aircraft
         fallback = cache_service.get_fallback(cache_key)
         if fallback:
             state_vectors, ts = fallback
-            logger.info(f"Returning stale cache with {len(state_vectors)} aircraft.")
-            return state_vectors, ts, True
+            if state_vectors and len(state_vectors) > 0:
+                logger.info(f"Returning stale cache with {len(state_vectors)} aircraft.")
+                return state_vectors, ts, True
 
-        # Initial fallback seed data if OpenSky is unreachable on first boot
-        seed_vectors = self._load_seed_vectors(lamin, lomin, lamax, lomax)
-        curr_ts = int(time.time())
-        cache_service.set(cache_key, (seed_vectors, curr_ts), ttl=settings.CACHE_TTL_SECONDS)
-        return seed_vectors, curr_ts, True
+        # 2. Initial fallback seed data if OpenSky is unreachable or cache was empty
+        if settings.FALLBACK_SAMPLE_CACHE:
+            seed_vectors = self._load_seed_vectors(lamin, lomin, lamax, lomax)
+            if seed_vectors:
+                curr_ts = int(time.time())
+                cache_service.set(cache_key, (seed_vectors, curr_ts), ttl=settings.CACHE_TTL_SECONDS)
+                logger.info(f"Returning {len(seed_vectors)} seed fallback aircraft vectors.")
+                return seed_vectors, curr_ts, True
+
+        return [], int(time.time()), True
 
     async def get_track(
         self,
@@ -156,7 +183,7 @@ class OpenSkyService:
             else:
                 logger.warning(f"OpenSky track endpoint returned HTTP {resp.status_code}")
         except Exception as e:
-            logger.error(f"Error fetching track for {icao24}: {str(e)}")
+            logger.error(f"Error fetching track for {icao24}: {self._format_error(e)}")
 
         return cache_service.get_fallback(cache_key)
 
@@ -183,7 +210,7 @@ class OpenSkyService:
                 cache_service.set(cache_key, flights, ttl=60)
                 return flights
         except Exception as e:
-            logger.error(f"Error fetching interval flights: {str(e)}")
+            logger.error(f"Error fetching interval flights: {self._format_error(e)}")
 
         return cache_service.get_fallback(cache_key) or []
 
@@ -211,7 +238,7 @@ class OpenSkyService:
                 cache_service.set(cache_key, flights, ttl=60)
                 return flights
         except Exception as e:
-            logger.error(f"Error fetching flights for {icao24}: {str(e)}")
+            logger.error(f"Error fetching flights for {icao24}: {self._format_error(e)}")
 
         return cache_service.get_fallback(cache_key) or []
 
@@ -239,7 +266,7 @@ class OpenSkyService:
                 cache_service.set(cache_key, flights, ttl=60)
                 return flights
         except Exception as e:
-            logger.error(f"Error fetching departures for {airport_icao}: {str(e)}")
+            logger.error(f"Error fetching departures for {airport_icao}: {self._format_error(e)}")
 
         return cache_service.get_fallback(cache_key) or []
 
@@ -267,7 +294,7 @@ class OpenSkyService:
                 cache_service.set(cache_key, flights, ttl=60)
                 return flights
         except Exception as e:
-            logger.error(f"Error fetching arrivals for {airport_icao}: {str(e)}")
+            logger.error(f"Error fetching arrivals for {airport_icao}: {self._format_error(e)}")
 
         return cache_service.get_fallback(cache_key) or []
 
@@ -280,6 +307,7 @@ class OpenSkyService:
     ) -> List[OpenSkyStateVector]:
         """Loads fallback seed state vectors from local data if OpenSky is unavailable."""
         seed_files = [
+            os.path.join(os.path.dirname(__file__), "..", "data", "iran_aircraft_50.json"),
             os.path.join(
                 os.path.dirname(__file__),
                 "..",
@@ -293,6 +321,8 @@ class OpenSkyService:
                 "data",
                 "iran_aircraft_50.json",
             ),
+            os.path.join(os.getcwd(), "backend", "app", "data", "iran_aircraft_50.json"),
+            os.path.join(os.getcwd(), "src", "pages", "Home", "components", "AircraftLayer", "data", "iran_aircraft_50.json"),
         ]
 
         for path in seed_files:
@@ -339,12 +369,52 @@ class OpenSkyService:
                         )
                         vectors.append(sv)
                     
-                    logger.info(f"Loaded {len(vectors)} seed aircraft state vectors from {path}")
-                    return vectors
+                    if vectors:
+                        logger.info(f"Loaded {len(vectors)} seed aircraft state vectors from {path}")
+                        return vectors
                 except Exception as ex:
                     logger.error(f"Error loading seed vectors: {ex}")
 
-        return []
+        # Fallback synthetic seed vectors if file could not be loaded
+        synthetic = []
+        sample_coords = [
+            ("738045", "IRA450", 35.6892, 51.3134, 32000, 440, 120),
+            ("738046", "MAH512", 32.7508, 51.8614, 28000, 420, 85),
+            ("738047", "TBZ601", 36.2352, 59.6410, 34000, 460, 240),
+            ("738048", "IRC205", 29.5392, 52.5898, 25000, 380, 15),
+            ("738049", "VRH300", 38.1339, 46.2350, 30000, 410, 160),
+            ("738050", "QSM710", 27.2183, 56.3778, 31000, 430, 330),
+        ]
+        curr_t = int(time.time())
+        for idx, (icao, cs, lat, lon, alt_ft, spd_kts, hdg) in enumerate(sample_coords):
+            if lamin is not None and lat < lamin:
+                continue
+            if lamax is not None and lat > lamax:
+                continue
+            if lomin is not None and lon < lomin:
+                continue
+            if lomax is not None and lon > lomax:
+                continue
+            synthetic.append(
+                OpenSkyStateVector(
+                    icao24=icao,
+                    callsign=cs,
+                    origin_country="Iran",
+                    time_position=curr_t,
+                    last_contact=curr_t,
+                    longitude=lon,
+                    latitude=lat,
+                    baro_altitude=alt_ft / 3.28084,
+                    on_ground=False,
+                    velocity=spd_kts / 1.94384,
+                    true_track=float(hdg),
+                    vertical_rate=0.0,
+                    geo_altitude=alt_ft / 3.28084,
+                    position_source=0,
+                    category=4,
+                )
+            )
+        return synthetic
 
 
 opensky_service = OpenSkyService()
