@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from typing import List, Optional, Set
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -8,6 +9,7 @@ from ....core.logging import logger
 from ....schemas.aircraft import Aircraft, AircraftListResponse
 from ....services.flight_enricher import enrich_airlabs_flight
 from ....services.airlabs_service import airlabs_service
+from ....services.sample_data_service import sample_data_service
 
 router = APIRouter(prefix="/ws", tags=["WebSocket"])
 
@@ -91,16 +93,35 @@ async def websocket_live_aircraft(
         while True:
             try:
                 valid_aircraft: List[Aircraft] = []
-                flights, timestamp, is_cached = await airlabs_service.get_flights(
-                    lamin=bbox.get("lamin"),
-                    lomin=bbox.get("lomin"),
-                    lamax=bbox.get("lamax"),
-                    lomax=bbox.get("lomax"),
-                )
-                for f in flights:
-                    ac = enrich_airlabs_flight(f)
-                    if ac:
-                        valid_aircraft.append(ac)
+                timestamp = int(time.time())
+                is_cached = False
+
+                try:
+                    flights, ts, cached_flag = await airlabs_service.get_flights(
+                        lamin=bbox.get("lamin"),
+                        lomin=bbox.get("lomin"),
+                        lamax=bbox.get("lamax"),
+                        lomax=bbox.get("lomax"),
+                    )
+                    timestamp = ts or timestamp
+                    is_cached = cached_flag
+
+                    for f in flights:
+                        ac = enrich_airlabs_flight(f)
+                        if ac:
+                            valid_aircraft.append(ac)
+                except Exception:
+                    pass
+
+                # Fallback to SampleData.json if live API returned 0 flights or failed
+                if not valid_aircraft:
+                    valid_aircraft = sample_data_service.get_aircraft(
+                        lamin=bbox.get("lamin"),
+                        lomin=bbox.get("lomin"),
+                        lamax=bbox.get("lamax"),
+                        lomax=bbox.get("lomax"),
+                    )
+                    is_cached = True
 
                 payload = AircraftListResponse(
                     total=len(valid_aircraft),

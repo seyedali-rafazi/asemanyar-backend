@@ -7,6 +7,8 @@ from ....schemas.aircraft import Aircraft, FleetStats
 from ....services.flight_enricher import enrich_airlabs_flight
 from ....services.airlabs_service import airlabs_service
 
+from ....services.sample_data_service import sample_data_service
+
 router = APIRouter(prefix="/stats", tags=["Stats"])
 
 
@@ -20,19 +22,34 @@ async def get_fleet_stats(
 ):
     """
     Computes summary telemetry and metrics for the active fleet using AirLabs data.
+    Falls back to SampleData.json if AirLabs returns no data or fails.
     """
-    flights, timestamp, _ = await airlabs_service.get_flights(
-        lamin=lamin,
-        lomin=lomin,
-        lamax=lamax,
-        lomax=lomax,
-    )
-
     valid: List[Aircraft] = []
-    for f in flights:
-        ac = enrich_airlabs_flight(f)
-        if ac:
-            valid.append(ac)
+    timestamp = int(time.time())
+
+    try:
+        flights, ts, _ = await airlabs_service.get_flights(
+            lamin=lamin,
+            lomin=lomin,
+            lamax=lamax,
+            lomax=lomax,
+        )
+        timestamp = ts or timestamp
+
+        for f in flights:
+            ac = enrich_airlabs_flight(f)
+            if ac:
+                valid.append(ac)
+    except Exception:
+        pass
+
+    if not valid:
+        return sample_data_service.get_fleet_stats(
+            lamin=lamin,
+            lomin=lomin,
+            lamax=lamax,
+            lomax=lomax,
+        )
 
     total = len(valid)
     airborne = sum(1 for ac in valid if not ac.on_ground and ac.altitude_ft > 500)
