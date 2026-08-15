@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import List, Set
+from typing import List, Optional, Set
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ....core.config import settings
