@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # Cache Settings
     CACHE_TTL_SECONDS: int = 10
-    FALLBACK_SAMPLE_CACHE: bool = True
+    FALLBACK_SAMPLE_CACHE: bool = False
 
     # Default Bounding Box (Iran airspace coordinates)
     DEFAULT_LAMIN: Optional[float] = 24.0

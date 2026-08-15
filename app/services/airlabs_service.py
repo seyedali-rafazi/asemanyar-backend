@@ -159,77 +159,7 @@ class AirLabsService:
                 logger.info(f"Returning stale AirLabs cache with {len(flights)} flights.")
                 return flights, ts, True
 
-        # 2. Sample fallback from seed file
-        if settings.FALLBACK_SAMPLE_CACHE:
-            seed_flights = self._load_seed_flights(lamin, lomin, lamax, lomax)
-            if seed_flights:
-                curr_ts = int(time.time())
-                cache_service.set(cache_key, (seed_flights, curr_ts), ttl=settings.CACHE_TTL_SECONDS)
-                logger.info(f"Returning {len(seed_flights)} seed fallback flights.")
-                return seed_flights, curr_ts, True
-
-        return [], int(time.time()), True
-
-    def _load_seed_flights(
-        self,
-        lamin: Optional[float] = None,
-        lomin: Optional[float] = None,
-        lamax: Optional[float] = None,
-        lomax: Optional[float] = None,
-    ) -> List[AirLabsFlight]:
-        """Loads static realistic flight dataset as fallback when offline."""
-        data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
-        seed_path = os.path.join(data_dir, "iran_aircraft_50.json")
-        if not os.path.exists(seed_path):
-            return []
-
-        try:
-            with open(seed_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            flights = []
-            for item in data:
-                lat = item.get("lat")
-                lon = item.get("lon")
-                if lat is None or lon is None:
-                    continue
-
-                if lamin is not None and lat < lamin:
-                    continue
-                if lamax is not None and lat > lamax:
-                    continue
-                if lomin is not None and lon < lomin:
-                    continue
-                if lomax is not None and lon > lomax:
-                    continue
-
-                speed_kmh = round((item.get("speed_kts") or 250) * 1.852, 1)
-                alt_m = round((item.get("altitude_ft") or 10000) * 0.3048, 1)
-
-                flights.append(
-                    AirLabsFlight(
-                        hex=item.get("id", "732001").lower(),
-                        reg_number=item.get("callsign", "EP-IRA"),
-                        flag="IR",
-                        lat=lat,
-                        lng=lon,
-                        alt=alt_m,
-                        dir=item.get("heading_deg", 90),
-                        speed=speed_kmh,
-                        v_speed=0,
-                        flight_icao=item.get("callsign", "IRA101"),
-                        flight_number=item.get("callsign", "101")[-3:],
-                        airline_icao="IRA",
-                        aircraft_icao="A320",
-                        updated=int(time.time()),
-                        status="en-route",
-                        type="adsb",
-                    )
-                )
-            return flights
-        except Exception as e:
-            logger.error(f"Failed to load seed flights: {e}")
-            return []
+        return [], int(time.time()), False
 
 
 # Global singleton instance
