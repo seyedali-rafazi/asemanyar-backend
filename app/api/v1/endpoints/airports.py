@@ -10,6 +10,7 @@ router = APIRouter(prefix="/airports", tags=["Airports"])
 
 def _load_airports() -> List[Airport]:
     file_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "iran_airports.json"),
         os.path.join(os.path.dirname(__file__), "..", "..", "data", "iran_airports.json"),
         os.path.join(
             os.path.dirname(__file__),

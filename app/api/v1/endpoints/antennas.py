@@ -10,6 +10,7 @@ router = APIRouter(prefix="/antennas", tags=["Antennas"])
 
 def _load_antennas() -> List[Antenna]:
     file_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "iran_antennas.json"),
         os.path.join(os.path.dirname(__file__), "..", "..", "data", "iran_antennas.json"),
         os.path.join(
             os.path.dirname(__file__),
