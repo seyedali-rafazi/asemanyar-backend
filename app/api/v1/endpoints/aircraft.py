@@ -24,6 +24,7 @@ async def list_aircraft(
     lomin: Optional[float] = Query(default=settings.DEFAULT_LOMIN, description="Lower longitude bound"),
     lamax: Optional[float] = Query(default=settings.DEFAULT_LAMAX, description="Upper latitude bound"),
     lomax: Optional[float] = Query(default=settings.DEFAULT_LOMAX, description="Upper longitude bound"),
+    zoom: Optional[float] = Query(default=None, description="Current map zoom level"),
     search: Optional[str] = Query(default=None, description="Search callsign, airline, or ICAO24"),
     airline: Optional[str] = Query(default=None, description="Filter by airline name"),
     min_altitude: Optional[int] = Query(default=None, description="Min altitude in feet"),

@@ -69,6 +69,8 @@ async def websocket_live_aircraft(websocket: WebSocket):
                             bbox["lamax"] = float(data["lamax"]) if data["lamax"] is not None else None
                         if "lomax" in data:
                             bbox["lomax"] = float(data["lomax"]) if data["lomax"] is not None else None
+                        if "zoom" in data:
+                            bbox["zoom"] = float(data["zoom"]) if data["zoom"] is not None else None
                         logger.info(f"WebSocket bbox updated by client: {bbox}")
                 except Exception:
                     pass

@@ -16,6 +16,7 @@ async def get_fleet_stats(
     lomin: Optional[float] = Query(default=settings.DEFAULT_LOMIN, description="Lower longitude bound"),
     lamax: Optional[float] = Query(default=settings.DEFAULT_LAMAX, description="Upper latitude bound"),
     lomax: Optional[float] = Query(default=settings.DEFAULT_LOMAX, description="Upper longitude bound"),
+    zoom: Optional[float] = Query(default=None, description="Current map zoom level"),
 ):
     """
     Computes summary telemetry and metrics for the active fleet using AirLabs data.
