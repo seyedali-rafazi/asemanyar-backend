@@ -31,6 +31,7 @@ class OpenSkyService:
         self._client: Optional[httpx.AsyncClient] = None
         self._oauth_token: Optional[str] = None
         self._oauth_token_expiry: float = 0.0
+        self._oauth_failed_at: float = 0.0
 
     async def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -69,6 +70,10 @@ class OpenSkyService:
         if self._oauth_token and time.time() < (self._oauth_token_expiry - 60):
             return {"Authorization": f"Bearer {self._oauth_token}"}
 
+        # Cooldown period if previous OAuth request failed
+        if self._oauth_failed_at and (time.time() - self._oauth_failed_at) < 30.0:
+            return {}
+
         # Request fresh OAuth2 access token
         try:
             client = await self.get_client()
@@ -82,20 +87,24 @@ class OpenSkyService:
                 self.auth_url,
                 data=payload,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10.0,
             )
             if resp.status_code == 200:
                 data = resp.json()
                 self._oauth_token = data.get("access_token")
                 expires_in = data.get("expires_in", 1800)
                 self._oauth_token_expiry = time.time() + expires_in
+                self._oauth_failed_at = 0.0
                 logger.info(f"OpenSky OAuth2 token refreshed successfully (expires in {expires_in}s).")
                 return {"Authorization": f"Bearer {self._oauth_token}"}
             else:
                 logger.error(f"OpenSky OAuth2 token request failed ({resp.status_code}): {resp.text}")
                 self._oauth_token = None
+                self._oauth_failed_at = time.time()
         except Exception as e:
             logger.error(f"Error fetching OpenSky OAuth2 token: {self._format_error(e)}")
             self._oauth_token = None
+            self._oauth_failed_at = time.time()
 
         return {}
 

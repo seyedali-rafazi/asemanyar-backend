@@ -1,11 +1,20 @@
+import os
+from pathlib import Path
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, AliasChoices
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file="backend/.env",
+        env_file=[
+            str(BASE_DIR / ".env"),
+            str(BASE_DIR.parent / ".env"),
+            ".env",
+            "backend/.env",
+        ],
         env_file_encoding="utf-8",
         extra="ignore",
     )
