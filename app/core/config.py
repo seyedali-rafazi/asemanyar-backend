@@ -27,17 +27,16 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
-    # OpenSky Network API
-    OPENSKY_BASE_URL: str = "https://opensky-network.org/api"
-    OPENSKY_AUTH_URL: str = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-    OPENSKY_USERNAME: Optional[str] = None
-    OPENSKY_PASSWORD: Optional[str] = None
-    OPENSKY_CLIENT_ID: Optional[str] = Field(default=None, validation_alias=AliasChoices("OPENSKY_CLIENT_ID", "clientId", "CLIENT_ID"))
-    OPENSKY_CLIENT_SECRET: Optional[str] = Field(default=None, validation_alias=AliasChoices("OPENSKY_CLIENT_SECRET", "clientSecret", "CLIENT_SECRET"))
-    OPENSKY_REQUEST_TIMEOUT: float = 25.0
-    OPENSKY_CONNECT_TIMEOUT: float = 15.0
+    # AirLabs API Configuration (https://airlabs.co/docs/flights)
+    AIRLABS_BASE_URL: str = "https://airlabs.co/api/v9"
+    AIRLABS_API_KEY: Optional[str] = Field(
+        default="15d21aa3-9c9d-4ad0-ba71-5eedcb2b2f7b",
+        validation_alias=AliasChoices("AIRLABS_API_KEY", "api_key", "AIRLABS_KEY")
+    )
+    AIRLABS_REQUEST_TIMEOUT: float = 30.0
+    AIRLABS_CONNECT_TIMEOUT: float = 20.0
 
-    # Proxy Configuration (Optional - for environments requiring proxy to reach OpenSky)
+    # Proxy Configuration (Optional)
     PROXY_URL: Optional[str] = None
     USE_SYSTEM_PROXY: bool = False
 

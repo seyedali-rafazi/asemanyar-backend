@@ -26,6 +26,19 @@ class Aircraft(BaseModel):
     geo_altitude_ft: Optional[int] = None
     category: Optional[int] = 0
 
+    # Rich AirLabs / Route properties
+    reg_number: Optional[str] = None
+    flight_icao: Optional[str] = None
+    flight_iata: Optional[str] = None
+    dep_iata: Optional[str] = None
+    dep_icao: Optional[str] = None
+    arr_iata: Optional[str] = None
+    arr_icao: Optional[str] = None
+    airline_icao: Optional[str] = None
+    airline_iata: Optional[str] = None
+    aircraft_icao: Optional[str] = None
+    status: Optional[str] = None
+
 
 class AircraftDetail(Aircraft):
     sensors: Optional[List[int]] = None

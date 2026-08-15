@@ -1,11 +1,11 @@
 import time
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Query
 
 from ....core.config import settings
-from ....schemas.aircraft import FleetStats
-from ....services.flight_enricher import enrich_state_vector
-from ....services.opensky_service import opensky_service
+from ....schemas.aircraft import Aircraft, FleetStats
+from ....services.flight_enricher import enrich_airlabs_flight
+from ....services.airlabs_service import airlabs_service
 
 router = APIRouter(prefix="/stats", tags=["Stats"])
 
@@ -18,17 +18,20 @@ async def get_fleet_stats(
     lomax: Optional[float] = Query(default=settings.DEFAULT_LOMAX, description="Upper longitude bound"),
 ):
     """
-    Computes summary telemetry and metrics for the active fleet.
+    Computes summary telemetry and metrics for the active fleet using AirLabs data.
     """
-    state_vectors, timestamp, _ = await opensky_service.get_states(
+    flights, timestamp, _ = await airlabs_service.get_flights(
         lamin=lamin,
         lomin=lomin,
         lamax=lamax,
         lomax=lomax,
     )
 
-    enriched = [enrich_state_vector(sv) for sv in state_vectors]
-    valid = [ac for ac in enriched if ac is not None]
+    valid: List[Aircraft] = []
+    for f in flights:
+        ac = enrich_airlabs_flight(f)
+        if ac:
+            valid.append(ac)
 
     total = len(valid)
     airborne = sum(1 for ac in valid if not ac.on_ground and ac.altitude_ft > 500)

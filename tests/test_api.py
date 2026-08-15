@@ -2,10 +2,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.schemas.opensky import OpenSkyStateVector
+from app.schemas.airlabs import AirLabsFlight
 from app.services.flight_enricher import (
-    enrich_state_vector,
-    enrich_state_vector_detail,
+    enrich_airlabs_flight,
+    enrich_airlabs_flight_detail,
     identify_airline,
 )
 
@@ -18,6 +18,7 @@ async def test_root_endpoint():
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "online"
+        assert data["provider"] == "airlabs"
         assert "endpoints" in data
 
 
@@ -29,6 +30,8 @@ async def test_health_endpoint():
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
+        assert data["provider"] == "airlabs"
+        assert data["airlabs_configured"] is True
 
 
 @pytest.mark.asyncio
@@ -89,39 +92,46 @@ def test_airline_identifier():
     assert identify_airline("TBZ789") == "ATA Airlines"
     assert identify_airline("THY100") == "Turkish Airlines"
     assert identify_airline("UAE400") == "Emirates"
+    assert identify_airline("KAC536") == "Kuwait Airways"
     assert identify_airline(None, "Iran") == "Iran"
     assert identify_airline(None, None) == "General Aviation"
 
 
-def test_enrich_state_vector():
-    sv = OpenSkyStateVector(
-        icao24="738045",
-        callsign="IRA450",
-        origin_country="Iran",
-        time_position=1700000000,
-        last_contact=1700000000,
-        longitude=51.3890,
-        latitude=35.6892,
-        baro_altitude=10000.0,  # meters (~32808 ft)
-        on_ground=False,
-        velocity=230.0,  # m/s (~447 kts)
-        true_track=180.0,
-        vertical_rate=5.0,
-        sensors=[1, 2],
-        geo_altitude=10100.0,
-        squawk="4321",
-        spi=False,
-        position_source=0,
-        category=4,
+def test_enrich_airlabs_flight():
+    flight = AirLabsFlight(
+        hex="706069",
+        reg_number="9K-AKP",
+        flag="KW",
+        lat=29.030092,
+        lng=48.011628,
+        alt=939,
+        dir=17.5,
+        speed=466,
+        v_speed=-19,
+        flight_number="536",
+        flight_icao="KAC536",
+        flight_iata="KU536",
+        dep_icao="HESX",
+        dep_iata="SPX",
+        arr_icao="OKKK",
+        arr_iata="KWI",
+        airline_icao="KAC",
+        airline_iata="KU",
+        aircraft_icao="A20N",
+        updated=1700000000,
+        status="en-route",
+        type="adsb",
     )
-    aircraft = enrich_state_vector(sv)
+    aircraft = enrich_airlabs_flight(flight)
     assert aircraft is not None
-    assert aircraft.id == "738045"
-    assert aircraft.callsign == "IRA450"
-    assert aircraft.airline == "Iran Air"
-    assert aircraft.altitude_ft == 32808
-    assert aircraft.speed_kts == 447
-    assert aircraft.heading_deg == 180
+    assert aircraft.id == "706069"
+    assert aircraft.callsign == "KAC536"
+    assert aircraft.airline == "Kuwait Airways"
+    assert aircraft.reg_number == "9K-AKP"
+    assert aircraft.aircraftType == "Airbus A320neo"
+    assert "Kuwait" in aircraft.destination_city
+    assert aircraft.speed_kts == int(round(466 * 0.539957))
+    assert aircraft.altitude_ft == int(round(939 * 3.28084))
     assert len(aircraft.path) > 0
 
 
@@ -129,7 +139,6 @@ def test_enrich_state_vector():
 async def test_aircraft_bbox_query():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # Query the exact URL reported by user: lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0
         response = await client.get("/api/v1/aircraft?lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0")
         assert response.status_code == 200
         data = response.json()
@@ -137,4 +146,3 @@ async def test_aircraft_bbox_query():
         assert len(data["aircraft"]) > 0
         assert data["total"] > 0
         assert data["count"] > 0
-

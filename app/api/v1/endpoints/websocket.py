@@ -5,9 +5,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ....core.config import settings
 from ....core.logging import logger
-from ....schemas.aircraft import AircraftListResponse
-from ....services.flight_enricher import enrich_state_vector
-from ....services.opensky_service import opensky_service
+from ....schemas.aircraft import Aircraft, AircraftListResponse
+from ....services.flight_enricher import enrich_airlabs_flight
+from ....services.airlabs_service import airlabs_service
 
 router = APIRouter(prefix="/ws", tags=["WebSocket"])
 
@@ -39,7 +39,7 @@ manager = ConnectionManager()
 @router.websocket("/live")
 async def websocket_live_aircraft(websocket: WebSocket):
     """
-    WebSocket endpoint streaming live flight updates every 10 seconds.
+    WebSocket endpoint streaming live flight updates every 10 seconds from AirLabs.
     Clients can send JSON commands to filter bounding boxes e.g.:
     {"lamin": 25.0, "lomin": 45.0, "lamax": 38.0, "lomax": 60.0}
     """
@@ -78,17 +78,17 @@ async def websocket_live_aircraft(websocket: WebSocket):
     async def stream_live_data():
         while True:
             try:
-                state_vectors, timestamp, is_cached = await opensky_service.get_states(
+                valid_aircraft: List[Aircraft] = []
+                flights, timestamp, is_cached = await airlabs_service.get_flights(
                     lamin=bbox.get("lamin"),
                     lomin=bbox.get("lomin"),
                     lamax=bbox.get("lamax"),
                     lomax=bbox.get("lomax"),
                 )
-                
-                aircraft_list = [
-                    enrich_state_vector(sv) for sv in state_vectors
-                ]
-                valid_aircraft = [ac for ac in aircraft_list if ac is not None]
+                for f in flights:
+                    ac = enrich_airlabs_flight(f)
+                    if ac:
+                        valid_aircraft.append(ac)
 
                 payload = AircraftListResponse(
                     total=len(valid_aircraft),
