@@ -37,21 +37,30 @@ manager = ConnectionManager()
 
 
 @router.websocket("/live")
-async def websocket_live_aircraft(websocket: WebSocket):
+async def websocket_live_aircraft(
+    websocket: WebSocket,
+    lamin: Optional[float] = None,
+    lomin: Optional[float] = None,
+    lamax: Optional[float] = None,
+    lomax: Optional[float] = None,
+    zoom: Optional[float] = None,
+):
     """
-    WebSocket endpoint streaming live flight updates every 10 seconds from AirLabs.
-    Clients can send JSON commands to filter bounding boxes e.g.:
-    {"lamin": 25.0, "lomin": 45.0, "lamax": 38.0, "lomax": 60.0}
+    WebSocket endpoint streaming live flight updates from AirLabs.
+    Clients can supply initial bounding box query parameters or send JSON commands
+    e.g. {"lamin": 25.0, "lomin": 45.0, "lamax": 38.0, "lomax": 60.0} to update filters.
     """
     await manager.connect(websocket)
-    
-    # Default filters
+
     bbox = {
-        "lamin": settings.DEFAULT_LAMIN,
-        "lomin": settings.DEFAULT_LOMIN,
-        "lamax": settings.DEFAULT_LAMAX,
-        "lomax": settings.DEFAULT_LOMAX,
+        "lamin": lamin if lamin is not None else settings.DEFAULT_LAMIN,
+        "lomin": lomin if lomin is not None else settings.DEFAULT_LOMIN,
+        "lamax": lamax if lamax is not None else settings.DEFAULT_LAMAX,
+        "lomax": lomax if lomax is not None else settings.DEFAULT_LOMAX,
+        "zoom": zoom,
     }
+
+    bbox_updated_event = asyncio.Event()
 
     async def listen_for_client_messages():
         nonlocal bbox
@@ -72,6 +81,7 @@ async def websocket_live_aircraft(websocket: WebSocket):
                         if "zoom" in data:
                             bbox["zoom"] = float(data["zoom"]) if data["zoom"] is not None else None
                         logger.info(f"WebSocket bbox updated by client: {bbox}")
+                        bbox_updated_event.set()
                 except Exception:
                     pass
         except WebSocketDisconnect:
@@ -107,7 +117,11 @@ async def websocket_live_aircraft(websocket: WebSocket):
                 logger.error(f"WebSocket stream error: {e}")
                 break
 
-            await asyncio.sleep(settings.CACHE_TTL_SECONDS)
+            bbox_updated_event.clear()
+            try:
+                await asyncio.wait_for(bbox_updated_event.wait(), timeout=settings.CACHE_TTL_SECONDS)
+            except asyncio.TimeoutError:
+                pass
 
     listener_task = asyncio.create_task(listen_for_client_messages())
     streamer_task = asyncio.create_task(stream_live_data())
