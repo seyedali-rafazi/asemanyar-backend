@@ -3,7 +3,7 @@ from fastapi import APIRouter, Query
 
 from ....core.config import settings
 from ....schemas.airlabs import AirLabsFlight
-from ....services.airlabs_service import airlabs_service
+from ....services.fleet_cache_manager import fleet_cache_manager
 
 router = APIRouter(prefix="/states", tags=["States"])
 
@@ -15,17 +15,16 @@ async def get_all_state_vectors(
     lamax: Optional[float] = Query(default=settings.DEFAULT_LAMAX, description="Upper latitude bound"),
     lomax: Optional[float] = Query(default=settings.DEFAULT_LOMAX, description="Upper longitude bound"),
     icao24: Optional[str] = Query(default=None, description="Filter by ICAO 24-bit hex address"),
-    force_refresh: bool = Query(default=False, description="Force fresh fetch from AirLabs"),
+    force_refresh: bool = Query(default=False, description="Ignored for rate-limit protection"),
 ):
     """
-    Returns raw live AirLabs flight state vectors for the bounding box or specific hex.
+    Returns raw cached flight state vectors matching the bounding box or specific hex.
+    Zero external API calls are made.
     """
-    flights, _, _ = await airlabs_service.get_flights(
+    return fleet_cache_manager.get_raw_flights(
         lamin=lamin,
         lomin=lomin,
         lamax=lamax,
         lomax=lomax,
         hex=icao24,
-        force_refresh=force_refresh,
     )
-    return flights

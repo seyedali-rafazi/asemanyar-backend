@@ -36,13 +36,21 @@ class Settings(BaseSettings):
     AIRLABS_REQUEST_TIMEOUT: float = 30.0
     AIRLABS_CONNECT_TIMEOUT: float = 20.0
 
+    # Scheduled Sync & Quota Protection (Free API Optimization)
+    # Sync every 2 hours = 7200 seconds (~10-12 calls per 24 hours)
+    AIRLABS_SYNC_INTERVAL_SECONDS: int = 7200
+    AIRLABS_MAX_DAILY_REQUESTS: int = 10
+    AIRLABS_FETCH_GLOBAL: bool = True
+    AIRLABS_AUTO_SYNC_ENABLED: bool = True
+    AIRLABS_CACHE_FILE: str = "app/data/aircraft_cache.json"
+
     # Proxy Configuration (Optional)
     PROXY_URL: Optional[str] = None
     USE_SYSTEM_PROXY: bool = False
 
     # Cache Settings
-    CACHE_TTL_SECONDS: int = 10
-    FALLBACK_SAMPLE_CACHE: bool = False
+    CACHE_TTL_SECONDS: int = 7200
+    FALLBACK_SAMPLE_CACHE: bool = True
 
     # Default Bounding Box (Iran airspace coordinates)
     DEFAULT_LAMIN: Optional[float] = 24.0

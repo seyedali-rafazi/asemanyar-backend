@@ -8,14 +8,13 @@ import httpx
 from ..core.config import settings
 from ..core.logging import logger
 from ..schemas.airlabs import AirLabsFlight, AirLabsFlightsResponse
-from ..schemas.aircraft import AircraftTrackResponse, TrackWaypoint
-from .cache_service import cache_service
 
 
 class AirLabsService:
     """
-    Asynchronous AirLabs Live Flights API Client (https://airlabs.co/docs/flights)
-    with connection pooling, in-memory TTL caching, and fallback protection.
+    Asynchronous AirLabs API Client (https://airlabs.co/docs/flights).
+    Used exclusively by the background sync worker to fetch global flight snapshots
+    at scheduled intervals (e.g. every 2 hours, max 10 requests / 24h).
     """
 
     def __init__(self):
@@ -25,9 +24,9 @@ class AirLabsService:
             connect=settings.AIRLABS_CONNECT_TIMEOUT,
         )
         self.limits = httpx.Limits(
-            max_keepalive_connections=10,
-            max_connections=20,
-            keepalive_expiry=120.0,
+            max_keepalive_connections=5,
+            max_connections=10,
+            keepalive_expiry=60.0,
         )
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -36,7 +35,7 @@ class AirLabsService:
             client_kwargs: Dict[str, Any] = {
                 "timeout": self.timeout,
                 "limits": self.limits,
-                "headers": {"User-Agent": "Asemanha-Flight-Tracker/1.0"},
+                "headers": {"User-Agent": "Asemanha-Flight-Tracker/2.0"},
                 "trust_env": settings.USE_SYSTEM_PROXY,
             }
             if settings.PROXY_URL:
@@ -48,10 +47,6 @@ class AirLabsService:
     async def close(self):
         if self._client and not self._client.is_closed:
             await self._client.aclose()
-
-    def _build_cache_key(self, prefix: str, params: Dict[str, Any]) -> str:
-        param_str = "_".join(f"{k}:{v}" for k, v in sorted(params.items()) if v is not None and k != "api_key")
-        return f"{prefix}_{param_str}"
 
     def _format_error(self, e: Exception) -> str:
         err_type = type(e).__name__
@@ -66,6 +61,83 @@ class AirLabsService:
             return f"{err_type}: Network error or host unreachable"
         return f"{err_type}: {msg}"
 
+    async def fetch_global_flights(self) -> Tuple[List[AirLabsFlight], int, bool, str]:
+        """
+        Executes a single global request to AirLabs for worldwide flight states.
+        Called strictly by the scheduled background sync worker.
+        Returns: (flights, timestamp, is_success, status_message)
+        """
+        api_key = settings.AIRLABS_API_KEY
+        if not api_key:
+            logger.warning("AIRLABS_API_KEY is not configured in environment.")
+            return [], int(time.time()), False, "API key not configured"
+
+        params: Dict[str, Any] = {
+            "api_key": api_key,
+        }
+
+        # If not fetching worldwide and default bounds configured:
+        if not settings.AIRLABS_FETCH_GLOBAL:
+            if (
+                settings.DEFAULT_LAMIN is not None
+                and settings.DEFAULT_LOMIN is not None
+                and settings.DEFAULT_LAMAX is not None
+                and settings.DEFAULT_LOMAX is not None
+            ):
+                params["bbox"] = (
+                    f"{settings.DEFAULT_LAMIN},{settings.DEFAULT_LOMIN},"
+                    f"{settings.DEFAULT_LAMAX},{settings.DEFAULT_LOMAX}"
+                )
+
+        client = await self.get_client()
+        url = f"{self.base_url}/flights"
+        logger.info(f"Initiating scheduled global flight sync from AirLabs: {url}")
+
+        for attempt in range(1, 3):
+            try:
+                resp = await client.get(url, params=params)
+                ts = int(time.time())
+
+                if resp.status_code == 200:
+                    data = resp.json()
+                    raw_flights = data.get("response") or []
+                    flights: List[AirLabsFlight] = []
+
+                    for item in raw_flights:
+                        if isinstance(item, dict) and "hex" in item:
+                            try:
+                                flights.append(AirLabsFlight(**item))
+                            except Exception:
+                                continue
+
+                    logger.info(f"AirLabs API returned {len(flights)} worldwide active flights.")
+                    return flights, ts, True, f"OK ({len(flights)} flights fetched)"
+
+                elif resp.status_code == 401:
+                    msg = "AirLabs API HTTP 401 Unauthorized (Invalid API key)"
+                    logger.error(msg)
+                    return [], ts, False, msg
+
+                elif resp.status_code == 429:
+                    msg = "AirLabs API HTTP 429 Rate Limit Reached"
+                    logger.warning(msg)
+                    return [], ts, False, msg
+
+                else:
+                    msg = f"AirLabs API HTTP {resp.status_code}: {resp.text[:150]}"
+                    logger.warning(msg)
+                    return [], ts, False, msg
+
+            except Exception as e:
+                err_msg = self._format_error(e)
+                logger.warning(f"AirLabs API attempt {attempt} failed: {err_msg}")
+                if attempt < 2:
+                    await asyncio.sleep(2.0)
+                else:
+                    return [], int(time.time()), False, f"Connection failed: {err_msg}"
+
+        return [], int(time.time()), False, "Max attempts reached"
+
     async def get_flights(
         self,
         lamin: Optional[float] = None,
@@ -78,88 +150,21 @@ class AirLabsService:
         force_refresh: bool = False,
     ) -> Tuple[List[AirLabsFlight], int, bool]:
         """
-        Fetches live flight states from AirLabs API matching filters/bounding box.
-        Returns (flights_list, timestamp, is_cached).
+        Helper method querying cached raw flight vectors from FleetCacheManager.
+        Preserved for backward compatibility.
         """
-        api_key = settings.AIRLABS_API_KEY
-        if not api_key:
-            logger.warning("AIRLABS_API_KEY is not configured in environment.")
+        from .fleet_cache_manager import fleet_cache_manager
 
-        params: Dict[str, Any] = {
-            "api_key": api_key,
-        }
-
-        # Bounding box format: South-West Lat, South-West Long, North-East Lat, North-East Long
-        if lamin is not None and lomin is not None and lamax is not None and lomax is not None:
-            params["bbox"] = f"{lamin},{lomin},{lamax},{lomax}"
-
-        if hex is not None:
-            params["hex"] = hex.lower()
-        if airline_icao is not None:
-            params["airline_icao"] = airline_icao.upper()
-        if flight_icao is not None:
-            params["flight_icao"] = flight_icao.upper()
-
-        cache_key = self._build_cache_key("airlabs_flights", params)
-
-        if not force_refresh:
-            cached_data = cache_service.get(cache_key)
-            if cached_data:
-                flights, ts = cached_data
-                return flights, ts, True
-
-        # Fetch from AirLabs API
-        client = await self.get_client()
-        url = f"{self.base_url}/flights"
-
-        for attempt in range(1, 3):
-            try:
-                logger.info(f"Fetching live flights from AirLabs API (attempt {attempt}/2): {params.get('bbox', hex or 'all')}")
-                resp = await client.get(url, params=params)
-
-                if resp.status_code == 200:
-                    data = resp.json()
-                    raw_flights = data.get("response") or []
-                    ts = int(time.time())
-
-                    flights: List[AirLabsFlight] = []
-                    for item in raw_flights:
-                        if isinstance(item, dict) and "hex" in item:
-                            try:
-                                flights.append(AirLabsFlight(**item))
-                            except Exception as parse_err:
-                                logger.debug(f"Failed to parse AirLabs flight item: {parse_err}")
-
-                    cache_service.set(cache_key, (flights, ts), ttl=settings.CACHE_TTL_SECONDS)
-                    logger.info(f"Retrieved {len(flights)} live flights from AirLabs API.")
-                    return flights, ts, False
-
-                elif resp.status_code == 401:
-                    logger.error(f"AirLabs API returned HTTP 401 Unauthorized. Verify AIRLABS_API_KEY.")
-                    break
-                elif resp.status_code == 429:
-                    logger.warning("AirLabs API rate limit reached (HTTP 429). Utilizing cached fallback.")
-                    break
-                else:
-                    logger.warning(f"AirLabs API returned HTTP {resp.status_code}: {resp.text[:200]}")
-                    break
-
-            except Exception as e:
-                logger.warning(f"AirLabs API attempt {attempt} error: {self._format_error(e)}")
-                if attempt < 2:
-                    await asyncio.sleep(1.0)
-                else:
-                    logger.error(f"Error connecting to AirLabs API after 2 attempts: {self._format_error(e)}")
-
-        # 1. Fallback to stale cache if available
-        fallback = cache_service.get_fallback(cache_key)
-        if fallback:
-            flights, ts = fallback
-            if flights and len(flights) > 0:
-                logger.info(f"Returning stale AirLabs cache with {len(flights)} flights.")
-                return flights, ts, True
-
-        return [], int(time.time()), False
+        flights = fleet_cache_manager.get_raw_flights(
+            lamin=lamin,
+            lomin=lomin,
+            lamax=lamax,
+            lomax=lomax,
+            hex=hex,
+            airline_icao=airline_icao,
+            flight_icao=flight_icao,
+        )
+        return flights, fleet_cache_manager.last_sync_time or int(time.time()), True
 
 
 # Global singleton instance

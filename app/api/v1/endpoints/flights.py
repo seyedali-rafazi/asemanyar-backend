@@ -1,9 +1,8 @@
-import time
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from ....schemas.airlabs import AirLabsFlight
-from ....services.airlabs_service import airlabs_service
+from ....services.fleet_cache_manager import fleet_cache_manager
 
 router = APIRouter(prefix="/flights", tags=["Flights"])
 
@@ -14,13 +13,13 @@ async def get_all_flights(
     flight_icao: Optional[str] = Query(default=None, description="Filter by Flight ICAO number"),
 ):
     """
-    Retrieves active live flights matching airline or flight code from AirLabs.
+    Retrieves active flights matching airline or flight code from the in-memory cache.
+    Zero external API calls are made.
     """
-    flights, _, _ = await airlabs_service.get_flights(
+    return fleet_cache_manager.get_raw_flights(
         airline_icao=airline_icao,
         flight_icao=flight_icao,
     )
-    return flights
 
 
 @router.get("/aircraft/{icao24}", response_model=List[AirLabsFlight])
@@ -28,7 +27,7 @@ async def get_flights_by_aircraft(
     icao24: str,
 ):
     """
-    Retrieves flight telemetry for a specific aircraft transponder (hex).
+    Retrieves flight telemetry for a specific aircraft transponder (hex) from cache.
+    Zero external API calls are made.
     """
-    flights, _, _ = await airlabs_service.get_flights(hex=icao24)
-    return flights
+    return fleet_cache_manager.get_raw_flights(hex=icao24)

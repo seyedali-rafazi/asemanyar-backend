@@ -1,13 +1,9 @@
-import time
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Query
 
 from ....core.config import settings
-from ....schemas.aircraft import Aircraft, FleetStats
-from ....services.flight_enricher import enrich_airlabs_flight
-from ....services.airlabs_service import airlabs_service
-
-from ....services.sample_data_service import sample_data_service
+from ....schemas.aircraft import FleetStats
+from ....services.fleet_cache_manager import fleet_cache_manager
 
 router = APIRouter(prefix="/stats", tags=["Stats"])
 
@@ -21,53 +17,12 @@ async def get_fleet_stats(
     zoom: Optional[float] = Query(default=None, description="Current map zoom level"),
 ):
     """
-    Computes summary telemetry and metrics for the active fleet using AirLabs data.
-    Falls back to SampleData.json if AirLabs returns no data or fails.
+    Computes summary telemetry and metrics for the active fleet using the global in-memory cache.
+    Zero external API calls are made.
     """
-    valid: List[Aircraft] = []
-    timestamp = int(time.time())
-
-    try:
-        flights, ts, _ = await airlabs_service.get_flights(
-            lamin=lamin,
-            lomin=lomin,
-            lamax=lamax,
-            lomax=lomax,
-        )
-        timestamp = ts or timestamp
-
-        for f in flights:
-            ac = enrich_airlabs_flight(f)
-            if ac:
-                valid.append(ac)
-    except Exception:
-        pass
-
-    if not valid:
-        return sample_data_service.get_fleet_stats(
-            lamin=lamin,
-            lomin=lomin,
-            lamax=lamax,
-            lomax=lomax,
-        )
-
-    total = len(valid)
-    airborne = sum(1 for ac in valid if not ac.on_ground and ac.altitude_ft > 500)
-    on_ground = total - airborne
-    
-    unique_airlines = len(set(ac.airline for ac in valid))
-    unique_types = len(set(ac.aircraftType for ac in valid))
-
-    avg_alt = int(sum(ac.altitude_ft for ac in valid) / total) if total > 0 else 0
-    avg_spd = int(sum(ac.speed_kts for ac in valid) / total) if total > 0 else 0
-
-    return FleetStats(
-        total_aircraft=total,
-        airborne=airborne,
-        on_ground=on_ground,
-        airlines_count=unique_airlines,
-        aircraft_types_count=unique_types,
-        avg_altitude_ft=avg_alt,
-        avg_speed_kts=avg_spd,
-        timestamp=timestamp or int(time.time()),
+    return fleet_cache_manager.get_fleet_stats(
+        lamin=lamin,
+        lomin=lomin,
+        lamax=lamax,
+        lomax=lomax,
     )

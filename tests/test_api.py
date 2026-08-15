@@ -8,6 +8,7 @@ from app.services.flight_enricher import (
     enrich_airlabs_flight_detail,
     identify_airline,
 )
+from app.services.fleet_cache_manager import fleet_cache_manager
 
 
 @pytest.mark.asyncio
@@ -31,7 +32,24 @@ async def test_health_endpoint():
         data = response.json()
         assert data["status"] == "healthy"
         assert data["provider"] == "airlabs"
-        assert data["airlabs_configured"] is True
+        assert "total_cached_aircraft" in data
+        assert "daily_requests_limit" in data
+        assert data["daily_requests_limit"] == 10
+        assert "sync_interval_hours" in data
+
+
+@pytest.mark.asyncio
+async def test_cache_status_endpoint():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/aircraft/cache/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert "total_cached_aircraft" in data
+        assert "sync_interval_seconds" in data
+        assert data["sync_interval_seconds"] == 7200
+        assert data["daily_requests_limit"] == 10
 
 
 @pytest.mark.asyncio
@@ -44,6 +62,41 @@ async def test_list_aircraft():
         assert "aircraft" in data
         assert "total" in data
         assert isinstance(data["aircraft"], list)
+        assert data["cached"] is True
+
+
+@pytest.mark.asyncio
+async def test_aircraft_bbox_query():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/aircraft?lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert "aircraft" in data
+        assert len(data["aircraft"]) > 0
+        assert data["total"] > 0
+        assert data["count"] > 0
+
+
+@pytest.mark.asyncio
+async def test_aircraft_detail_and_track():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        list_resp = await client.get("/api/v1/aircraft")
+        assert list_resp.status_code == 200
+        aircraft_list = list_resp.json()["aircraft"]
+        assert len(aircraft_list) > 0
+        test_id = aircraft_list[0]["id"]
+
+        detail_resp = await client.get(f"/api/v1/aircraft/{test_id}")
+        assert detail_resp.status_code == 200
+        detail = detail_resp.json()
+        assert detail["id"] == test_id
+
+        track_resp = await client.get(f"/api/v1/aircraft/{test_id}/track")
+        assert track_resp.status_code == 200
+        track = track_resp.json()
+        assert track["id"] == test_id.upper()
 
 
 @pytest.mark.asyncio
@@ -59,6 +112,17 @@ async def test_fleet_stats():
 
 
 @pytest.mark.asyncio
+async def test_raw_states_and_flights():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        states_resp = await client.get("/api/v1/states/all")
+        assert states_resp.status_code == 200
+
+        flights_resp = await client.get("/api/v1/flights/all")
+        assert flights_resp.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_airports_endpoint():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -68,7 +132,6 @@ async def test_airports_endpoint():
         assert data["total"] > 0
         assert len(data["airports"]) > 0
 
-        # Test single airport lookup
         single_resp = await client.get("/api/v1/airports/OIII")
         assert single_resp.status_code == 200
         airport_data = single_resp.json()
@@ -135,14 +198,7 @@ def test_enrich_airlabs_flight():
     assert len(aircraft.path) > 0
 
 
-@pytest.mark.asyncio
-async def test_aircraft_bbox_query():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/v1/aircraft?lamin=24.0&lomin=44.0&lamax=40.0&lomax=64.0")
-        assert response.status_code == 200
-        data = response.json()
-        assert "aircraft" in data
-        assert len(data["aircraft"]) > 0
-        assert data["total"] > 0
-        assert data["count"] > 0
+def test_quota_manager():
+    # Verify quota tracker works correctly
+    can_call, _ = fleet_cache_manager.can_make_api_call()
+    assert can_call is True

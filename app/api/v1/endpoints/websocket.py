@@ -7,9 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from ....core.config import settings
 from ....core.logging import logger
 from ....schemas.aircraft import Aircraft, AircraftListResponse
-from ....services.flight_enricher import enrich_airlabs_flight
-from ....services.airlabs_service import airlabs_service
-from ....services.sample_data_service import sample_data_service
+from ....services.fleet_cache_manager import fleet_cache_manager
 
 router = APIRouter(prefix="/ws", tags=["WebSocket"])
 
@@ -48,9 +46,10 @@ async def websocket_live_aircraft(
     zoom: Optional[float] = None,
 ):
     """
-    WebSocket endpoint streaming live flight updates from AirLabs.
+    WebSocket endpoint streaming live flight updates from the persistent in-memory global cache.
     Clients can supply initial bounding box query parameters or send JSON commands
     e.g. {"lamin": 25.0, "lomin": 45.0, "lamax": 38.0, "lomax": 60.0} to update filters.
+    All data is served from memory with zero external API calls.
     """
     await manager.connect(websocket)
 
@@ -82,7 +81,6 @@ async def websocket_live_aircraft(
                             bbox["lomax"] = float(data["lomax"]) if data["lomax"] is not None else None
                         if "zoom" in data:
                             bbox["zoom"] = float(data["zoom"]) if data["zoom"] is not None else None
-                        logger.info(f"WebSocket bbox updated by client: {bbox}")
                         bbox_updated_event.set()
                 except Exception:
                     pass
@@ -92,43 +90,19 @@ async def websocket_live_aircraft(
     async def stream_live_data():
         while True:
             try:
-                valid_aircraft: List[Aircraft] = []
-                timestamp = int(time.time())
-                is_cached = False
-
-                try:
-                    flights, ts, cached_flag = await airlabs_service.get_flights(
-                        lamin=bbox.get("lamin"),
-                        lomin=bbox.get("lomin"),
-                        lamax=bbox.get("lamax"),
-                        lomax=bbox.get("lomax"),
-                    )
-                    timestamp = ts or timestamp
-                    is_cached = cached_flag
-
-                    for f in flights:
-                        ac = enrich_airlabs_flight(f)
-                        if ac:
-                            valid_aircraft.append(ac)
-                except Exception:
-                    pass
-
-                # Fallback to SampleData.json if live API returned 0 flights or failed
-                if not valid_aircraft:
-                    valid_aircraft = sample_data_service.get_aircraft(
-                        lamin=bbox.get("lamin"),
-                        lomin=bbox.get("lomin"),
-                        lamax=bbox.get("lamax"),
-                        lomax=bbox.get("lomax"),
-                    )
-                    is_cached = True
+                valid_aircraft = fleet_cache_manager.get_aircraft(
+                    lamin=bbox.get("lamin"),
+                    lomin=bbox.get("lomin"),
+                    lamax=bbox.get("lamax"),
+                    lomax=bbox.get("lomax"),
+                )
 
                 payload = AircraftListResponse(
                     total=len(valid_aircraft),
                     count=len(valid_aircraft),
-                    time=timestamp,
+                    time=fleet_cache_manager.last_sync_time or int(time.time()),
                     aircraft=valid_aircraft,
-                    cached=is_cached,
+                    cached=True,
                 )
 
                 await websocket.send_text(payload.model_dump_json())
@@ -140,7 +114,8 @@ async def websocket_live_aircraft(
 
             bbox_updated_event.clear()
             try:
-                await asyncio.wait_for(bbox_updated_event.wait(), timeout=settings.CACHE_TTL_SECONDS)
+                # Stream updates every 10 seconds or immediately when client moves bbox
+                await asyncio.wait_for(bbox_updated_event.wait(), timeout=10.0)
             except asyncio.TimeoutError:
                 pass
 
