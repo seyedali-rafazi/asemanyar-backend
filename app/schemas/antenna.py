@@ -1,18 +1,20 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 
 class Antenna(BaseModel):
     id: str
     name: str
-    code: str
+    type: str
     lat: float
     lon: float
-    city: str
-    range_km: int
-    frequency_mhz: float
-    type: str
-    status: str
+    range_km: Optional[int] = 0
+    status: Optional[str] = "active"
+    frequency: Optional[str] = None
+    frequency_mhz: Optional[float] = None
+    operator: Optional[str] = None
+    city: Optional[str] = None
+    code: Optional[str] = None
 
 
 class AntennaListResponse(BaseModel):
